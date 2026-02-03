@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { ResearchState } from '../types';
-import { Download, RefreshCw, Pencil, ClipboardList, PenTool } from 'lucide-react';
+import { Download, RefreshCw, Pencil, ClipboardList, Loader2 } from 'lucide-react';
+import { toPng } from 'html-to-image';
 
 interface PosterStudioProps {
   state: ResearchState;
@@ -14,9 +15,43 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({ state, onReset }) =>
   const [fact2, setFact2] = useState('');
   const [fact3, setFact3] = useState('');
   const [tip, setTip] = useState('');
+  const [name, setName] = useState('');
+  const [isDownloading, setIsDownloading] = useState(false);
+
+  // Ref for the element we want to capture
+  const posterRef = useRef<HTMLDivElement>(null);
 
   const verdictColor = state.verdict === 'FACT' ? 'bg-green-500' : state.verdict === 'FICTION' ? 'bg-red-500' : 'bg-yellow-500';
   const verdictText = state.verdict === 'FACT' ? 'FEIT' : state.verdict === 'FICTION' ? 'FABEL' : 'HET HANGT ERVAN AF';
+
+  const handleDownload = useCallback(async () => {
+    if (posterRef.current === null) {
+      return;
+    }
+
+    setIsDownloading(true);
+
+    try {
+      // Small delay to ensure any rendering is finished
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      const dataUrl = await toPng(posterRef.current, { 
+        cacheBust: true, 
+        pixelRatio: 2, // High quality for retina/printing
+        backgroundColor: '#ffffff' // Ensure white background in case of transparency
+      });
+      
+      const link = document.createElement('a');
+      link.download = `voedselfabel-slide-${Date.now()}.png`;
+      link.href = dataUrl;
+      link.click();
+    } catch (err) {
+      console.error('Oeps, het downloaden is mislukt', err);
+      alert('Het lukte niet om de afbeelding te maken. Probeer het nog eens of maak een screenshot.');
+    } finally {
+      setIsDownloading(false);
+    }
+  }, [posterRef]);
 
   return (
     <div className="max-w-7xl mx-auto p-4 md:p-6">
@@ -83,6 +118,17 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({ state, onReset }) =>
                       rows={2}
                    />
                 </div>
+
+                <div>
+                   <label className="block text-sm font-semibold text-slate-600 mb-1">Jouw Naam</label>
+                   <input 
+                      type="text" 
+                      value={name} 
+                      onChange={(e) => setName(e.target.value)}
+                      className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none"
+                      placeholder="Typ je naam..."
+                   />
+                </div>
              </div>
           </div>
         </div>
@@ -91,7 +137,11 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({ state, onReset }) =>
         <div className="lg:col-span-5 flex flex-col items-center sticky top-8 h-fit">
            <div className="mb-2 text-sm font-bold text-slate-400 uppercase tracking-widest">Live Voorbeeld</div>
            
-           <div className="bg-white p-6 md:p-8 rounded-3xl shadow-2xl w-full max-w-sm border-[6px] border-slate-900 relative overflow-hidden aspect-[9/16] flex flex-col transition-all">
+           {/* THE POSTER ITSELF - Wrapped with REF */}
+           <div 
+             ref={posterRef}
+             className="bg-white p-6 md:p-8 rounded-3xl shadow-2xl w-full max-w-sm border-[6px] border-slate-900 relative overflow-hidden aspect-[9/16] flex flex-col"
+           >
                 {/* Background Decor */}
                 <div className="absolute top-0 right-0 w-48 h-48 bg-gradient-to-br from-purple-200 to-pink-200 rounded-full blur-3xl opacity-50 -translate-y-1/2 translate-x-1/2 pointer-events-none"></div>
                 <div className="absolute bottom-0 left-0 w-48 h-48 bg-gradient-to-tr from-blue-200 to-cyan-200 rounded-full blur-3xl opacity-50 translate-y-1/2 -translate-x-1/2 pointer-events-none"></div>
@@ -144,21 +194,31 @@ export const PosterStudio: React.FC<PosterStudioProps> = ({ state, onReset }) =>
 
                     <div className="mt-4 text-center">
                         <p className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">Onderzocht door:</p>
-                        <p className="text-xs font-bold text-slate-600">Jouw Naam</p>
+                        <p className="text-xs font-bold text-slate-600">{name || "Jouw Naam"}</p>
                         <p className="text-[9px] text-slate-300 mt-1">Voedselfabel App</p>
                     </div>
                 </div>
             </div>
 
             <div className="mt-8 flex gap-4 w-full max-w-sm justify-center">
-                <button onClick={onReset} className="flex-1 flex justify-center items-center px-4 py-3 bg-white border-2 border-slate-200 rounded-full font-bold text-slate-600 hover:bg-slate-50 transition-colors text-sm">
+                <button 
+                  onClick={onReset} 
+                  disabled={isDownloading}
+                  className="flex-1 flex justify-center items-center px-4 py-3 bg-white border-2 border-slate-200 rounded-full font-bold text-slate-600 hover:bg-slate-50 transition-colors text-sm disabled:opacity-50"
+                >
                     <RefreshCw size={16} className="mr-2" /> Opnieuw
                 </button>
                 <button 
-                    onClick={() => window.print()}
-                    className="flex-1 flex justify-center items-center px-4 py-3 bg-slate-900 text-white rounded-full font-bold shadow-lg hover:bg-slate-800 hover:scale-105 transition-all text-sm"
+                    onClick={handleDownload}
+                    disabled={isDownloading}
+                    className="flex-1 flex justify-center items-center px-4 py-3 bg-slate-900 text-white rounded-full font-bold shadow-lg hover:bg-slate-800 hover:scale-105 transition-all text-sm disabled:opacity-70 disabled:hover:scale-100"
                 >
-                    <Download size={16} className="mr-2" /> Opslaan
+                    {isDownloading ? (
+                      <Loader2 size={16} className="mr-2 animate-spin" /> 
+                    ) : (
+                      <Download size={16} className="mr-2" />
+                    )}
+                    {isDownloading ? 'Bezig...' : 'Opslaan'}
                 </button>
             </div>
         </div>
