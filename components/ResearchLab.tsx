@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Myth, GroundingSource } from '../types';
 import { searchMythTopic } from '../services/geminiService';
-import { Search, Loader2, ExternalLink, PlusCircle, CheckCircle2 } from 'lucide-react';
+import { Search, Loader2, ExternalLink, PlusCircle, CheckCircle2, Link as LinkIcon, Plus } from 'lucide-react';
 
 interface ResearchLabProps {
   myth: Myth;
@@ -14,6 +14,11 @@ export const ResearchLab: React.FC<ResearchLabProps> = ({ myth, onContinue }) =>
   const [sources, setSources] = useState<GroundingSource[]>([]);
   const [selectedSources, setSelectedSources] = useState<GroundingSource[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
+
+  // State for adding custom source
+  const [isAddingSource, setIsAddingSource] = useState(false);
+  const [customTitle, setCustomTitle] = useState('');
+  const [customUrl, setCustomUrl] = useState('');
 
   // Auto-search on mount to guide the user immediately
   useEffect(() => {
@@ -42,6 +47,31 @@ export const ResearchLab: React.FC<ResearchLabProps> = ({ myth, onContinue }) =>
     }
   };
 
+  const handleAddCustomSource = () => {
+    if (!customTitle.trim() || !customUrl.trim()) return;
+
+    let formattedUrl = customUrl.trim();
+    if (!formattedUrl.startsWith('http')) {
+        formattedUrl = `https://${formattedUrl}`;
+    }
+
+    const newSource: GroundingSource = {
+        title: customTitle,
+        url: formattedUrl,
+        snippet: 'Handmatig toegevoegde bron.'
+    };
+
+    setSources([...sources, newSource]);
+    // Automatically select the new source for convenience, if possible
+    if (selectedSources.length < 2) {
+        setSelectedSources([...selectedSources, newSource]);
+    }
+    
+    setCustomTitle('');
+    setCustomUrl('');
+    setIsAddingSource(false);
+  };
+
   return (
     <div className="max-w-4xl mx-auto p-6 space-y-8">
       <div className="bg-white rounded-2xl p-8 shadow-sm border border-slate-100">
@@ -65,7 +95,7 @@ export const ResearchLab: React.FC<ResearchLabProps> = ({ myth, onContinue }) =>
 
             <div>
               <h3 className="font-bold text-slate-800 mb-4">Gevonden Bronnen</h3>
-              <p className="text-sm text-slate-500 mb-4">Kies <span className="font-bold">2 bronnen</span> die je wilt controleren op betrouwbaarheid.</p>
+              <p className="text-sm text-slate-500 mb-4">Kies <span className="font-bold">2 bronnen</span> die je wilt controleren op betrouwbaarheid. Werken de links niet? Voeg dan zelf een bron toe.</p>
               
               <div className="grid gap-4">
                 {sources.length > 0 ? sources.map((source, idx) => {
@@ -78,7 +108,7 @@ export const ResearchLab: React.FC<ResearchLabProps> = ({ myth, onContinue }) =>
                       <div className="flex-1 mb-3 md:mb-0 mr-4">
                         <h4 className="font-semibold text-slate-900 line-clamp-1">{source.title}</h4>
                         <a href={source.url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline flex items-center mt-1 w-fit">
-                          {source.url} <ExternalLink size={12} className="ml-1" />
+                          <LinkIcon size={12} className="mr-1" /> {source.url} <ExternalLink size={12} className="ml-1" />
                         </a>
                       </div>
                       <button
@@ -94,9 +124,65 @@ export const ResearchLab: React.FC<ResearchLabProps> = ({ myth, onContinue }) =>
                     </div>
                   );
                 }) : (
-                  <p className="text-slate-500 italic">Geen bronnen gevonden. Probeer het later opnieuw.</p>
+                  <p className="text-slate-500 italic">Geen bronnen gevonden.</p>
                 )}
               </div>
+
+              {/* Manual Add Source Section */}
+              <div className="mt-6 pt-6 border-t border-slate-100">
+                {!isAddingSource ? (
+                    <button 
+                        onClick={() => setIsAddingSource(true)}
+                        className="flex items-center text-purple-600 font-bold hover:text-purple-700 hover:underline transition-colors"
+                    >
+                        <Plus size={18} className="mr-2" /> Ik wil zelf een andere bron toevoegen
+                    </button>
+                ) : (
+                    <div className="bg-slate-50 p-5 rounded-xl border border-slate-200 animate-in fade-in slide-in-from-top-2">
+                        <h4 className="font-bold text-slate-800 mb-4 text-sm flex items-center">
+                            <PlusCircle size={16} className="mr-2 text-purple-600"/> Zelf een bron toevoegen
+                        </h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                            <div>
+                                <label className="block text-xs font-semibold text-slate-500 mb-1">Titel van de website / artikel</label>
+                                <input 
+                                    type="text"
+                                    placeholder="Bijv: Nu.nl artikel over vetten" 
+                                    className="w-full p-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 outline-none"
+                                    value={customTitle}
+                                    onChange={e => setCustomTitle(e.target.value)}
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-semibold text-slate-500 mb-1">Link (URL)</label>
+                                <input 
+                                    type="text"
+                                    placeholder="www.voorbeeld.nl" 
+                                    className="w-full p-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 outline-none"
+                                    value={customUrl}
+                                    onChange={e => setCustomUrl(e.target.value)}
+                                />
+                            </div>
+                        </div>
+                        <div className="flex gap-3">
+                            <button 
+                                onClick={handleAddCustomSource} 
+                                disabled={!customTitle || !customUrl}
+                                className="bg-purple-600 text-white px-5 py-2 rounded-lg text-sm font-bold hover:bg-purple-700 disabled:opacity-50"
+                            >
+                                Toevoegen
+                            </button>
+                            <button 
+                                onClick={() => setIsAddingSource(false)} 
+                                className="text-slate-500 px-4 py-2 text-sm hover:text-slate-700"
+                            >
+                                Annuleren
+                            </button>
+                        </div>
+                    </div>
+                )}
+              </div>
+
             </div>
 
             <div className="flex justify-end pt-6">
